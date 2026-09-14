@@ -1,0 +1,41 @@
+import useScrollAnimation from "../hooks/useScrollAnimation.js";
+
+function JobCard({ job }) {
+    const [ref, isVisible] = useScrollAnimation();
+
+    return (
+        <div
+            ref={ref}
+            className={`bg-gray-800/60 backdrop-blur-sm border border-gray-700/50 p-5 rounded-xl transition-all duration-700 ${
+                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            }`}
+        >
+            <h3 className="text-lg font-bold text-white">{job.title}</h3>
+            <p className="text-gray-400 text-sm">
+                {job.company} • {job.location}
+            </p>
+
+            <div className="flex flex-wrap gap-2 mt-3">
+                {job.requiredSkills.map((skill, index) => (
+                    <span
+                        key={index}
+                        className="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full text-sm"
+                    >
+                        {skill}
+                    </span>
+                ))}
+            </div>
+
+            <a
+                href={job.jobUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-3 text-purple-400 hover:underline text-sm"
+            >
+                View Job
+            </a>
+        </div>
+    );
+}
+
+export default JobCard;
