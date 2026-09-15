@@ -92,7 +92,8 @@ const loggedInUser = await User.findById(user._id).select(
 
 const options = {
     httpOnly: true,// normally cookie issue nhi ho sakrta 
-    secure: true
+    secure: true,
+    sameSite: "none"
 };
 return res
     .status(200)
@@ -123,7 +124,8 @@ const logoutUser = asyncHandler(async (req, res) => {
     );
     const options = {
         httpOnly: true,
-        secure: true
+        secure: true,
+        sameSite: "none"
     };
     //to logout me humne 2 jagah cleanup kiya:
     // MongoDB
@@ -188,7 +190,8 @@ await user.save({ validateBeforeSave: false });
 
 const options = {
     httpOnly: true,
-    secure: true
+    secure: true,
+    sameSite: "none"
 };
 
 return res
