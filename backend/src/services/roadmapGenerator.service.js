@@ -42,7 +42,7 @@ Do not return markdown formatting.
 Do not return multiple JSON objects.
 `;
 const response = await ai.models.generateContent({
-    model: "gemini-3.5-flash",
+    model: "gemini-3.5-flash-lite",
     contents: prompt,
     config: {
         responseMimeType: "application/json",
