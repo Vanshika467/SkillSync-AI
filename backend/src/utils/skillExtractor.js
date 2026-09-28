@@ -5,6 +5,63 @@ const ai = new GoogleGenAI({
 });
 
 
+// ==================== GEMINI RETRY HELPER ====================
+
+// Gemini kabhi-kabhi temporary 503/429 error de sakta hai.
+// Isliye request fail hone par kuch seconds wait karke retry karenge.
+
+const generateWithRetry = async (request, maxRetries = 3) => {
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+
+        try {
+
+            return await ai.models.generateContent(request);
+
+        } catch (error) {
+
+            const statusCode =
+                error?.status ||
+                error?.code ||
+                error?.error?.code;
+
+            console.error(
+                `Gemini API attempt ${attempt + 1} failed:`,
+                error?.message || error
+            );
+
+            // Sirf temporary errors par retry karna hai
+            const shouldRetry =
+                statusCode === 429 ||
+                statusCode === 500 ||
+                statusCode === 502 ||
+                statusCode === 503 ||
+                statusCode === 504;
+
+            // Agar retry karne layak error nahi hai
+            if (!shouldRetry || attempt === maxRetries) {
+                throw error;
+            }
+
+            // Exponential backoff:
+            // 1st retry → 3 sec
+            // 2nd retry → 6 sec
+            // 3rd retry → 12 sec
+
+            const delay = 3000 * Math.pow(2, attempt);
+
+            console.log(
+                `Retrying Gemini request after ${delay / 1000} seconds...`
+            );
+
+            await new Promise((resolve) =>
+                setTimeout(resolve, delay)
+            );
+        }
+    }
+};
+
+
 // ==================== EXTRACT SKILLS FOR ATS ====================
 
 const extractSkills = async (resumeText, jobDescription) => {
@@ -13,8 +70,10 @@ const extractSkills = async (resumeText, jobDescription) => {
         throw new Error("Resume text and job description are required");
     }
 
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry({
+
         model: "gemini-3.5-flash",
+
         contents: `
         Extract technical skills from the resume and job description.
         
@@ -29,6 +88,7 @@ const extractSkills = async (resumeText, jobDescription) => {
         Job Description:
         ${jobDescription}
         `,
+
         config: {
             responseMimeType: "application/json", //response needed in json
         },
@@ -37,7 +97,9 @@ const extractSkills = async (resumeText, jobDescription) => {
 
     const outputText = response.text;
 
-    const skills = JSON.parse(outputText); //Lekin AI ka output initially text/string hota hai. Hume JavaScript object chahiye, isliye:
+    const skills = JSON.parse(outputText);
+    //Lekin AI ka output initially text/string hota hai.
+    //Hume JavaScript object chahiye, isliye:
 
     return skills;
 };
@@ -46,6 +108,7 @@ const extractSkills = async (resumeText, jobDescription) => {
 // ==================== JSON HELPER FUNCTION ====================
 
 // Naya helper function — file ke top pe ya alag utils file mein daal sakti ho
+
 const extractFirstJsonObject = (text) => {
 
     const startIndex = text.indexOf("{");
@@ -81,8 +144,10 @@ const extractJobSkills = async (jobDescription) => {
         return [];
     }
 
-    const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash", // pehle ye model name verify kar lo
+    const response = await generateWithRetry({
+
+        model: "gemini-3.5-flash",
+        // pehle ye model name verify kar lo
 
         contents: `
 Extract only the technical skills required in the following job description.
@@ -103,26 +168,42 @@ ${jobDescription}
 `,
 
         config: {
-            responseMimeType: "application/json", //answer json mein aye isiliye
+            responseMimeType: "application/json",
+            //answer json mein aye isiliye
         },
+
     });
 
-    const outputText = response.text; //ye use kiya jo response aye usko text part mein nikalne ke liye
+    const outputText = response.text;
+    //ye use kiya jo response aye usko text part mein nikalne ke liye
 
     // Sirf pehla complete JSON object nikalo
+
     const cleanedJson = extractFirstJsonObject(outputText);
 
     if (!cleanedJson) {
-        console.error("No valid JSON found in Gemini response:", outputText);
+
+        console.error(
+            "No valid JSON found in Gemini response:",
+            outputText
+        );
+
         return [];
     }
 
     let jobSkills;
 
     try {
+
         jobSkills = JSON.parse(cleanedJson);
+
     } catch (error) {
-        console.error("JSON parse failed. Raw response was:", outputText);
+
+        console.error(
+            "JSON parse failed. Raw response was:",
+            outputText
+        );
+
         return [];
     }
 
@@ -131,6 +212,7 @@ ${jobDescription}
 
 
 // ==================== EXTRACT SKILLS FOR MULTIPLE JOBS ====================
+
 // Ye naya function hai.
 // Pehle 5 jobs ke liye 5 Gemini API calls ho rahi thi.
 // Ab 5 jobs ko ek saath bhejkar sirf 1 Gemini API call karenge.
@@ -148,7 +230,7 @@ DESCRIPTION:
 ${job.description}
 `).join("\n\n");
 
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry({
 
         model: "gemini-3.5-flash",
 
@@ -176,6 +258,7 @@ ${jobsText}
         config: {
             responseMimeType: "application/json",
         },
+
     });
 
     const outputText = response.text;
@@ -186,6 +269,7 @@ ${jobsText}
     const cleanedJson = extractFirstJsonObject(outputText);
 
     if (!cleanedJson) {
+
         console.error(
             "No valid JSON found in Gemini multiple jobs response:",
             outputText
